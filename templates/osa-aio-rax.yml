@@ -54,12 +54,13 @@ resources:
                   set -x
                   cd /opt
                   git clone %osa_repo% -b %osa_release% || exit_failure "Git Clone Failure"
-                  if [[ %user_vars_url% -neq "false" ]]; then
-                      curl %user_vars_url% -o /opt/cloud/user_variables.yml
+                  USER_VARS_FILE=false
+                  if [[ ${USER_VARS_FILE} -ne "false" ]]; then
+                      curl false -o /opt/cloud/user_variables.yml
                   else
                       cat > /opt/cloud/user_variables.yml <<EOF
-                      ---
-                      EOF
+                  ---
+                  EOF
                   fi
                 params:
                   "%swift_signal_notify%": { get_attr: [ swift_signal_handle_infra1, curl_cli ] }
