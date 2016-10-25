@@ -71,9 +71,14 @@ resources:
                   "%osa_repo%":               { get_param: "osa_repo" }
         runcmd:
           - tmux new-session -s osa-heat-multi -d
-          - tmux rename-window runcmd-bash
-          - tmux select-window -t runcmd-bash
+          - tmux rename-window deploy
+          - tmux select-window -t deploy
+          - tmux send-keys "touch /opt/cloud/runcmd-bash.err /opt/cloud/runcmd-bash.log /opt/cloud/bootstrap-ansible.err /opt/cloud/bootstrap-ansible.log /opt/cloud/bootstrap-aio.err /opt/cloud/bootstrap-aio.log /opt/cloud/setup-everything.err /opt/cloud/setup-everything.log" C-m
           - tmux send-keys "/opt/cloud/runcmd-bash >> /opt/cloud/runcmd-bash.log 2>> /opt/cloud/runcmd-bash.err" C-m
+          - tmux send-keys "cd /opt/openstack-ansible && scripts/bootstrap-ansible.sh >> /opt/cloud/bootstrap-ansible.log 2>> /opt/cloud/bootstrap-ansible.err" C-m
+          - tmux send-keys "cd /opt/openstack-ansible && scripts/bootstrap-aio.sh >> /opt/cloud/bootstrap-aio.log 2>> /opt/cloud/bootstrap-aio.err" C-m
+          - tmux send-keys "cp /opt/cloud/user_variables.yml /etc/openstack_deploy" C-m
+          - tmux send-keys "cd /opt/openstack-ansible/playbooks && openstack-ansible setup-everything.yml >> /opt/cloud/bootstrap-aio.log 2>> /opt/cloud/bootstrap-aio.err" C-m
 
   server_aio1:
     type: OS::Nova::Server
