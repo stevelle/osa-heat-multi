@@ -54,16 +54,16 @@ resources:
                   set -x
                   cd /opt
                   git clone %osa_repo% -b %osa_release% || exit_failure "Git Clone Failure"
-                  USER_VARS_FILE=false
+                  USER_VARS_FILE=%user_vars_url%
+                  cd openstack-ansible
+                  scripts/bootstrap-ansible.sh >> /opt/cloud/bootstrap-ansible.log 2>> /opt/cloud/bootstrap-ansible.err
+                  scripts/bootstrap-aio.sh >> /opt/cloud/bootstrap-aio.log 2>> /opt/cloud/bootstrap-aio.err
                   if [[ ${USER_VARS_FILE} -ne "false" ]]; then
-                      curl false -o /opt/cloud/user_variables.yml
-                  else
-                      cat > /opt/cloud/user_variables.yml <<EOF
-                  ---
-                  EOF
+                      curl ${USER_VARS_FILE} -o /etc/openstack_deploy/user_variables.yml
                   fi
+                  cd playbooks
+                  openstack-ansible setup-everything.yml >> /opt/cloud/setup-everything.log 2>> /opt/cloud/setup-everything.err
                 params:
-                  "%swift_signal_notify%": { get_attr: [ swift_signal_handle_infra1, curl_cli ] }
                   "%osa_release%":         { get_param: "osa_release" }
                   "%osa_repo%":            { get_param: "osa_repo" }
                   "%user_vars_url%":       { get_param: "user_vars_url" }
@@ -73,10 +73,6 @@ resources:
           - tmux select-window -t deploy
           - tmux send-keys "touch /opt/cloud/runcmd-bash.err /opt/cloud/runcmd-bash.log /opt/cloud/bootstrap-ansible.err /opt/cloud/bootstrap-ansible.log /opt/cloud/bootstrap-aio.err /opt/cloud/bootstrap-aio.log /opt/cloud/setup-everything.err /opt/cloud/setup-everything.log" C-m
           - tmux send-keys "/opt/cloud/runcmd-bash >> /opt/cloud/runcmd-bash.log 2>> /opt/cloud/runcmd-bash.err" C-m
-          - tmux send-keys "cd /opt/openstack-ansible && scripts/bootstrap-ansible.sh >> /opt/cloud/bootstrap-ansible.log 2>> /opt/cloud/bootstrap-ansible.err" C-m
-          - tmux send-keys "cd /opt/openstack-ansible && scripts/bootstrap-aio.sh >> /opt/cloud/bootstrap-aio.log 2>> /opt/cloud/bootstrap-aio.err" C-m
-          - tmux send-keys "cp /opt/cloud/user_variables.yml /etc/openstack_deploy" C-m
-          - tmux send-keys "cd /opt/openstack-ansible/playbooks && openstack-ansible setup-everything.yml >> /opt/cloud/bootstrap-aio.log 2>> /opt/cloud/bootstrap-aio.err" C-m
 
   server_aio1:
     type: OS::Nova::Server
