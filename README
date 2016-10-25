@@ -1,0 +1,8 @@
+How do you build a multi-node cluster with OpenStack-Ansible?
+
+Here we try to demonstrate.
+
+This repository is heavily influenced by: 
+
+https://github.com/cloud-training/rpc-heat-ansible
+
