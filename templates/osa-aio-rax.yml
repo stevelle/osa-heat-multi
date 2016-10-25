@@ -1,0 +1,96 @@
+heat_template_version: 2013-05-23
+
+description: Deploy An Openstack-Ansible Private Cloud on Rackspace Public Cloud
+
+parameters:
+  osa_release:
+    type: string
+    label: OpenStack-Ansible Release
+    description: A branch, tag, or SHA to work from
+    default: 'master'
+  osa_repo:
+    type: string
+    label: OpenStack-Ansible Repo
+    description: A repository containing OpenStack-Ansible
+    default : 'https://github.com/openstack/openstack-ansible.git'
+  aio_flavor:
+    type: string
+    label: AIO Node Flavor
+    default: '7'
+  keypair:
+    type: string
+    label: Keypair
+
+resources:
+  swift_signal_handle_infra1:
+    type: OS::Heat::SwiftSignalHandle
+
+  cloud_config_aio1:
+    type: OS::Heat::CloudConfig
+    properties:
+      cloud_config:
+        output:
+          all: '| tee -a /var/log/cloud-init-output.log'
+        apt_upgrade: true
+        packages:
+          - curl
+          - fail2ban
+          - tmux
+          - htop
+          - multitail
+          - vim
+          - git-core
+        write_files:
+          - path: /opt/cloud/runcmd-bash
+            permissions: "0700"
+            content:
+              str_replace:
+                template: |
+                  #!/bin/bash
+                  export HOME="/root"
+                  set -e
+                  set -x
+                  function exit_failure {
+                    %swift_signal_notify% --data-binary '{"status": "FAILURE", "reason": "'"$@"'"}'
+                    exit 1
+                  }
+                  function exit_success {
+                    %swift_signal_notify% --data-binary '{"status": "SUCCESS"}'
+                  }
+                  cd /opt
+                  git clone %osa_repo% -b %osa_release% || exit_failure "Git Clone Failure"
+                  cd openstack-ansible
+                  scripts/bootstrap-ansible.sh
+                  scripts/bootstrap-aio.sh
+                  cd playbooks
+                  openstack-ansible setup-everything.yml
+                  exit_success
+                params:
+                  "%swift_signal_notify%": { get_attr: [ swift_signal_handle_infra1, curl_cli ] }
+                  "%osa_release%":               { get_param: "osa_release" }
+                  "%osa_repo%":               { get_param: "osa_repo" }
+        runcmd:
+          - tmux new-session -s osa-heat-multi -d
+          - tmux rename-window runcmd-bash
+          - tmux select-window -t runcmd-bash
+          - tmux send-keys "/opt/cloud/runcmd-bash >> /opt/cloud/runcmd-bash.log 2>> /opt/cloud/runcmd-bash.err" C-m
+
+  server_aio1:
+    type: OS::Nova::Server
+    properties:
+      name:
+        str_replace:
+          template: "osa-aio1-%heat_stack_prefix%"
+          params:
+            "%heat_stack_prefix%": { "Fn::Select": [ "0", { "Fn::Split" : [ "-", { get_param: "OS::stack_id" } ] } ] }
+      flavor: { get_param: "aio_flavor" }
+      image: Ubuntu 16.04 LTS (Xenial Xerus) (PVHVM)
+      key_name: { get_param: keypair }
+      config_drive: True
+      user_data_format: RAW
+      user_data: { get_resource: cloud_config_aio1 }
+
+outputs:
+  server_aio1_ip:
+    description: AIO1 IP
+    value: { get_attr: [ server_aio1, accessIPv4 ] }
