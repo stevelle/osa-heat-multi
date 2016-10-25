@@ -20,11 +20,13 @@ parameters:
   keypair:
     type: string
     label: Keypair
+  user_vars_url:
+    type: string
+    label: Provided User Variables File
+    description: An optional url to download a user_variables.yml file from (e.g. raw url from paste.openstack.org)
+    default : 'false'
 
 resources:
-  swift_signal_handle_infra1:
-    type: OS::Heat::SwiftSignalHandle
-
   cloud_config_aio1:
     type: OS::Heat::CloudConfig
     properties:
@@ -50,25 +52,20 @@ resources:
                   export HOME="/root"
                   set -e
                   set -x
-                  function exit_failure {
-                    %swift_signal_notify% --data-binary '{"status": "FAILURE", "reason": "'"$@"'"}'
-                    exit 1
-                  }
-                  function exit_success {
-                    %swift_signal_notify% --data-binary '{"status": "SUCCESS"}'
-                  }
                   cd /opt
                   git clone %osa_repo% -b %osa_release% || exit_failure "Git Clone Failure"
-                  cd openstack-ansible
-                  scripts/bootstrap-ansible.sh
-                  scripts/bootstrap-aio.sh
-                  cd playbooks
-                  openstack-ansible setup-everything.yml
-                  exit_success
+                  if [[ %user_vars_url% -neq "false" ]]; then
+                      curl %user_vars_url% -o /opt/cloud/user_variables.yml
+                  else
+                      cat > /opt/cloud/user_variables.yml <<EOF
+                      ---
+                      EOF
+                  fi
                 params:
                   "%swift_signal_notify%": { get_attr: [ swift_signal_handle_infra1, curl_cli ] }
-                  "%osa_release%":               { get_param: "osa_release" }
-                  "%osa_repo%":               { get_param: "osa_repo" }
+                  "%osa_release%":         { get_param: "osa_release" }
+                  "%osa_repo%":            { get_param: "osa_repo" }
+                  "%user_vars_url%":       { get_param: "user_vars_url" }
         runcmd:
           - tmux new-session -s osa-heat-multi -d
           - tmux rename-window deploy
